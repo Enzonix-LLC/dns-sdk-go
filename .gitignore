@@ -1,0 +1,9 @@
+# Go build artefacts
+/bin/
+/pkg/
+
+# IDE/editor
+.idea/
+.vscode/
+
+
