@@ -8,27 +8,22 @@ import (
 	"testing"
 )
 
-func TestListRecords(t *testing.T) {
+func TestListDomainRecords(t *testing.T) {
 	t.Parallel()
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
 			t.Fatalf("expected GET got %s", r.Method)
 		}
-		if r.URL.Path != "/zones/example.com/records" {
+		if r.URL.Path != "/api/client/domains/domain-123/records" {
 			t.Fatalf("unexpected path: %s", r.URL.Path)
-		}
-		if got := r.URL.Query().Get("name"); got != "www" {
-			t.Fatalf("expected name query www, got %s", got)
 		}
 		if got := r.Header.Get("Authorization"); got != "Bearer key" {
 			t.Fatalf("missing authorization header")
 		}
 
-		json.NewEncoder(w).Encode(map[string]any{
-			"records": []Record{
-				{ID: "1", Zone: "example.com", Name: "www", Type: "A", Content: "1.1.1.1"},
-			},
+		json.NewEncoder(w).Encode([]Record{
+			{ID: "1", DomainID: "domain-123", Name: "www", Type: "A", Value: "1.1.1.1"},
 		})
 	}))
 	defer server.Close()
@@ -38,7 +33,7 @@ func TestListRecords(t *testing.T) {
 		t.Fatalf("setup error: %v", err)
 	}
 
-	records, err := client.ListRecords(context.Background(), "example.com.", &ListRecordsOptions{Name: "www"})
+	records, err := client.ListDomainRecords(context.Background(), "domain-123")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -55,19 +50,22 @@ func TestCreateRecord(t *testing.T) {
 		if r.Method != http.MethodPost {
 			t.Fatalf("expected POST got %s", r.Method)
 		}
+		if r.URL.Path != "/api/client/records" {
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
 		var payload CreateRecordRequest
 		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
 			t.Fatalf("decode body: %v", err)
 		}
-		if payload.Name != "_acme-challenge" {
-			t.Fatalf("unexpected name: %s", payload.Name)
+		if payload.DomainID != "domain-123" {
+			t.Fatalf("unexpected domain id: %s", payload.DomainID)
 		}
 		json.NewEncoder(w).Encode(Record{
-			ID:      "abc",
-			Zone:    "example.com",
-			Name:    payload.Name,
-			Type:    payload.Type,
-			Content: payload.Content,
+			ID:       "abc",
+			DomainID: payload.DomainID,
+			Name:     payload.Name,
+			Type:     payload.Type,
+			Value:    payload.Value,
 		})
 	}))
 	defer server.Close()
@@ -77,10 +75,11 @@ func TestCreateRecord(t *testing.T) {
 		t.Fatalf("setup error: %v", err)
 	}
 
-	record, err := client.CreateRecord(context.Background(), "example.com", CreateRecordRequest{
-		Name:    "_acme-challenge",
-		Type:    "TXT",
-		Content: "token",
+	record, err := client.CreateRecord(context.Background(), CreateRecordRequest{
+		DomainID: "domain-123",
+		Name:     "_acme-challenge",
+		Type:     "TXT",
+		Value:    "token",
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -95,13 +94,13 @@ func TestUpdateRecord(t *testing.T) {
 	t.Parallel()
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPatch {
-			t.Fatalf("expected PATCH got %s", r.Method)
+		if r.Method != http.MethodPut {
+			t.Fatalf("expected PUT got %s", r.Method)
 		}
-		if r.URL.Path != "/zones/example.com/records/abc" {
+		if r.URL.Path != "/api/client/records/abc" {
 			t.Fatalf("unexpected path: %s", r.URL.Path)
 		}
-		json.NewEncoder(w).Encode(Record{ID: "abc", Zone: "example.com", Name: "www", Type: "A", Content: "2.2.2.2"})
+		json.NewEncoder(w).Encode(Record{ID: "abc", DomainID: "domain-123", Name: "www", Type: "A", Value: "2.2.2.2"})
 	}))
 	defer server.Close()
 
@@ -110,14 +109,14 @@ func TestUpdateRecord(t *testing.T) {
 		t.Fatalf("setup error: %v", err)
 	}
 
-	content := "2.2.2.2"
-	record, err := client.UpdateRecord(context.Background(), "example.com.", "abc", UpdateRecordRequest{
-		Content: &content,
+	value := "2.2.2.2"
+	record, err := client.UpdateRecord(context.Background(), "abc", UpdateRecordRequest{
+		Value: &value,
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if record.Content != "2.2.2.2" {
+	if record.Value != "2.2.2.2" {
 		t.Fatalf("unexpected record: %#v", record)
 	}
 }
@@ -129,7 +128,10 @@ func TestDeleteRecord(t *testing.T) {
 		if r.Method != http.MethodDelete {
 			t.Fatalf("expected DELETE got %s", r.Method)
 		}
-		w.WriteHeader(http.StatusNoContent)
+		if r.URL.Path != "/api/client/records/abc" {
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+		w.WriteHeader(http.StatusOK)
 	}))
 	defer server.Close()
 
@@ -138,7 +140,7 @@ func TestDeleteRecord(t *testing.T) {
 		t.Fatalf("setup error: %v", err)
 	}
 
-	if err := client.DeleteRecord(context.Background(), "example.com", "abc"); err != nil {
+	if err := client.DeleteRecord(context.Background(), "abc"); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }

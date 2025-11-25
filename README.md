@@ -28,12 +28,22 @@ func main() {
 		log.Fatal(err)
 	}
 
-	records, err := client.ListRecords(context.Background(), "example.com", nil)
+	// Fetch all domains available to the API token
+	domains, err := client.ListDomains(context.Background())
+	if err != nil {
+		log.Fatal(err)
+	}
+	if len(domains) == 0 {
+		log.Println("no domains yet")
+		return
+	}
+
+	records, err := client.ListDomainRecords(context.Background(), domains[0].ID)
 	if err != nil {
 		log.Fatal(err)
 	}
 	for _, record := range records {
-		log.Printf("%s %s %s", record.Name, record.Type, record.Content)
+		log.Printf("%s %s %s", record.Name, record.Type, record.Value)
 	}
 }
 ```
@@ -41,11 +51,11 @@ func main() {
 ### Creating records
 
 ```go
-record, err := client.CreateRecord(ctx, "example.com", enzonix.CreateRecordRequest{
-	Name:    "_acme-challenge",
-	Type:    "TXT",
-	Content: "token",
-	TTL:     120,
+record, err := client.CreateRecord(ctx, enzonix.CreateRecordRequest{
+	DomainID: domains[0].ID,
+	Name:     "_acme-challenge",
+	Type:     "TXT",
+	Value:    "token",
 })
 if err != nil {
 	log.Fatal(err)
@@ -57,19 +67,19 @@ log.Printf("created record %s", record.ID)
 
 ```go
 value := "203.0.113.42"
-updated, err := client.UpdateRecord(ctx, "example.com", record.ID, enzonix.UpdateRecordRequest{
-	Content: &value,
+updated, err := client.UpdateRecord(ctx, record.ID, enzonix.UpdateRecordRequest{
+	Value: &value,
 })
 if err != nil {
 	log.Fatal(err)
 }
-log.Printf("updated record to %s", updated.Content)
+log.Printf("updated record to %s", updated.Value)
 ```
 
 ### Deleting records
 
 ```go
-if err := client.DeleteRecord(ctx, "example.com", record.ID); err != nil {
+if err := client.DeleteRecord(ctx, record.ID); err != nil {
 	log.Fatal(err)
 }
 ```
