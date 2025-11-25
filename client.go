@@ -14,7 +14,7 @@ import (
 )
 
 const (
-	defaultBaseURL   = "https://api.enzonix.com/v1/dns"
+	defaultBaseURL   = "https://api.ns.enzonix.com"
 	defaultTimeout   = 10 * time.Second
 	defaultUserAgent = "enzonix-dns-sdk-go/0.1.0"
 )
